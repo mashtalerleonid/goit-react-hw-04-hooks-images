@@ -1,41 +1,71 @@
-import React, { Component } from "react";
+import "react-toastify/dist/ReactToastify.css";
+import { useState, useEffect } from "react";
+import { fetchImages } from "./services/images-api";
+import { toast, ToastContainer } from "react-toastify";
+
 import Searchbar from "./components/Searchbar";
 import ImageGallery from "./components/ImageGallery";
-import Modal from "./components/Modal";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import { fetchImages } from "./services/images-api";
 import Loader from "components/Loader";
 import Button from "components/Button";
+import Modal from "./components/Modal";
 
-class App extends Component {
-  state = {
-    selectedImageUrl: null,
-    query: "",
-    page: 1,
-    status: "idle",
-    totalHits: 0,
-    images: [],
-    error: null,
+export default function App() {
+  const [selectedImageUrl, setSelectedImageUrl] = useState(null);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState("idle");
+  const [totalHits, setTotalHits] = useState(0);
+  const [images, setImages] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!query) {
+      return;
+    }
+
+    setStatus("pending");
+
+    fetchImages(page, query)
+      .then((response) => {
+        const { totalHits, hits } = response;
+
+        if (page === 1) {
+          setImages([...hits]);
+        } else {
+          setImages((prev) => [...prev, ...hits]);
+        }
+
+        setTotalHits(totalHits);
+        setStatus("resolved");
+
+        if (totalHits === 0) {
+          makeNotification("No results");
+        }
+      })
+      .catch((error) => {
+        setError(error);
+        setStatus("rejected");
+      });
+  }, [query, page]);
+
+  const closeModal = (e) => {
+    setSelectedImageUrl(null);
   };
 
-  closeModal = (e) => {
-    this.setState({ selectedImageUrl: null });
+  const handleSubmit = (query) => {
+    setPage(1);
+    setQuery(query);
   };
 
-  handleSubmit = (query) => {
-    this.setState({ query, page: 1 });
+  const handleSelectImage = (imageUrl) => {
+    setSelectedImageUrl(imageUrl);
   };
 
-  handleSelectImage = (imageUrl) => {
-    this.setState({ selectedImageUrl: imageUrl });
+  const incrementPage = () => {
+    setPage((prev) => prev + 1);
   };
 
-  incrementPage = () => {
-    this.setState((prevState) => ({ page: prevState.page + 1 }));
-  };
-
-  makeNotification = (text) => {
+  const makeNotification = (text) => {
     toast(text, {
       autoClose: 2500,
       type: "info",
@@ -43,71 +73,29 @@ class App extends Component {
     });
   };
 
-  componentDidUpdate(prevProps, prevState) {
-    const prevImages = prevState.images;
-    const prevQuery = prevState.query;
-    const prevPage = prevState.page;
-    const nextQuery = this.state.query;
-    const nextPage = this.state.page;
+  const maxPage = Math.ceil(totalHits / 12);
 
-    if (prevQuery !== nextQuery || prevPage !== nextPage) {
-      this.setState({ status: "pending" });
+  return (
+    <div>
+      <Searchbar submit={handleSubmit} notify={makeNotification} />
 
-      fetchImages(nextPage, nextQuery)
-        .then((response) => {
-          const { totalHits, hits } = response;
+      {images && <ImageGallery onSelect={handleSelectImage} images={images} />}
 
-          if (nextPage === 1) {
-            this.setState({
-              images: [...hits],
-              status: "resolved",
-              totalHits,
-            });
-          } else {
-            this.setState({
-              images: [...prevImages, ...hits],
-              status: "resolved",
-              totalHits,
-            });
-          }
+      {status === "pending" && <Loader />}
 
-          if (totalHits === 0) {
-            this.makeNotification("No results");
-          }
-        })
-        .catch((error) => this.setState({ error, status: "rejected" }));
-    }
-  }
+      {status === "resolved" && page < maxPage && (
+        <Button page={page} onClick={incrementPage} />
+      )}
 
-  render() {
-    const { selectedImageUrl, page, status, totalHits, error } = this.state;
-    const maxPage = Math.ceil(totalHits / 12);
+      {status === "rejected" && <h1>{error.message}</h1>}
 
-    return (
-      <div>
-        <Searchbar submit={this.handleSubmit} notify={this.makeNotification} />
+      <ToastContainer />
 
-        <ImageGallery
-          onSelect={this.handleSelectImage}
-          images={this.state.images}
-        />
-
-        {status === "pending" && <Loader />}
-
-        {status === "resolved" && page < maxPage && (
-          <Button page={page} onClick={this.incrementPage} />
-        )}
-
-        {status === "rejected" && <h1>{error.message}</h1>}
-
-        {selectedImageUrl && (
-          <Modal handleClose={this.closeModal}>
-            <img src={selectedImageUrl} alt="" />
-          </Modal>
-        )}
-      </div>
-    );
-  }
+      {selectedImageUrl && (
+        <Modal handleClose={closeModal}>
+          <img src={selectedImageUrl} alt="" />
+        </Modal>
+      )}
+    </div>
+  );
 }
-
-export default App;

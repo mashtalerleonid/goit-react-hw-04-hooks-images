@@ -1,8 +1,8 @@
-import { Component } from "react";
+import { useEffect } from "react";
 
-class Button extends Component {
-  componentDidMount() {
-    if (this.props.page === 1) {
+function Button({ page, onClick }) {
+  useEffect(() => {
+    if (page === 1) {
       window.scrollTo({
         top: 0,
         behavior: "smooth",
@@ -13,15 +13,13 @@ class Button extends Component {
         behavior: "smooth",
       });
     }
-  }
+  }, [page]);
 
-  render() {
-    return (
-      <button className="Button" type="button" onClick={this.props.onClick}>
-        Load more
-      </button>
-    );
-  }
+  return (
+    <button className="Button" type="button" onClick={onClick}>
+      Load more
+    </button>
+  );
 }
 
 export default Button;
